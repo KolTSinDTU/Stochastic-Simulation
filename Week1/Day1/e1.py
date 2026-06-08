@@ -9,40 +9,59 @@ working you are free to use builtin functions"""
 integer representation."""
 
 
-"""A Linear congruential generator is defined by x_i = mod(ax_{i-1} + c, M),  
-where x_0 is given and a, c and M need to be chosen carefully"""
-
 import matplotlib.pyplot as plt
 import random as rand
 
 SAMPLES = 10_000
 
-def lcg(x0, a, c, M):
-    numbers = []
-    x = x0
-    for _ in range(SAMPLES):
-        x = (a*x +c)%M
-        numbers.append(x)
+def lcg(seed, a, c, M, n):
+    values = []
+    x = seed
 
-    max_x = max(numbers)
-    result = [x/max_x for x in numbers]
+    for i in range(n):
+        x = (a * x + c) % M
+        values.append(x / M)
 
-    return result
+    return values
 
-def chai_squared(n_classes, rand_num, samples, bins):
+def chi_squared(samples, bins):
     T = 0
-    sorted_keys = sorted(rand_num.keys())
-    for i in range(n_classes):
-        print(f"this is the actual number of {i} smaples: {rand_num[sorted_keys[i]]}, and this is the expected number: {(samples/bins)}")
-        T += (rand_num[sorted_keys[i]] - (samples/bins))**2 / (samples/bins)
+    n = len(samples)
+    expected = n/bins
+    
+    observed = [0] * bins
+    for u in samples:
+        bin_index = int(u * bins)
+        observed[bin_index] += 1
+
+    for obs in observed:
+        T += ((obs - expected) ** 2) / expected
 
     return T
 
-def bin_list(rand_list,bins):
-    size_bin = 1/bins
-    sorted_list = sorted(rand_list)
-    for i in range(len(rand_list)):
-        if sorted_list[i]> size_bin:
+def kolmogorov_smironv(samples):
+    n = len(samples)
+    sorted_samples = sorted(samples)
+
+    d_plus = 0.0
+    d_minus = 0.0
+
+    for i in range(1, n + 1):
+        x_i = sorted_samples[i - 1]
+
+        # Difference just after x_i
+        d_plus_i = i / n - x_i
+
+        # Difference just before x_i
+        d_minus_i = x_i - (i - 1) / n
+
+        if d_plus_i > d_plus:
+            d_plus = d_plus_i
+
+        if d_minus_i > d_minus:
+            d_minus = d_minus_i
+
+    return max(d_plus, d_minus)
             
 
 
@@ -52,13 +71,13 @@ a = 5
 c = 1
 M = 16
 
-random_numbers = lcg(seed, a, c, M)
-# print(random_numbers)
+random_numbers = lcg(seed, a, c, M, SAMPLES)
 
-
-
-T = chai_squared(bins, SAMPLES, bins)
+T = chi_squared(random_numbers, bins)
 print(T)
+
+ks_statistic = kolmogorov_smironv(random_numbers)
+print(ks_statistic)
 
 # randints = [rand.randint for _  in range(SAMPLES)]
 plt.hist(random_numbers)
