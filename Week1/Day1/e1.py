@@ -62,25 +62,34 @@ def kolmogorov_smironv(samples):
             d_minus = d_minus_i
 
     return max(d_plus, d_minus)
+
+def use_builtin_rng(samples: int):
+    return [rand.random() for _ in range(samples)]
             
 
 
-bins = 10
+bins = 100
 seed = 3
-a = 5
-c = 1
-M = 16
+a = 1664525
+c = 1013904223
+M = 2**32
 
 random_numbers = lcg(seed, a, c, M, SAMPLES)
+random_numbers_builtin = use_builtin_rng(SAMPLES)
 
 T = chi_squared(random_numbers, bins)
+T_builtin = chi_squared(random_numbers_builtin, bins)
 print(T)
+print(T_builtin)
 
 ks_statistic = kolmogorov_smironv(random_numbers)
+ks_statistic_builtin = kolmogorov_smironv(random_numbers_builtin)
+
 print(ks_statistic)
 
 # randints = [rand.randint for _  in range(SAMPLES)]
-plt.hist(random_numbers)
-# plt.scatter(range(10000), random_numbers)
+# plt.hist(random_numbers)
+# plt.scatter(random_numbers, range(10000))
+plt.scatter(random_numbers_builtin, range(10000))
 # plt.scatter(range(10000), [rand.randint for _  in range(10000)])
 plt.show()
