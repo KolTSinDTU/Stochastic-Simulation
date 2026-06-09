@@ -56,21 +56,19 @@ def alias(probabilities):
     for i in large + small:
         prob[i] = 1.0
 
-    samples = []
-    for _ in range(SAMPLES):
-        i = rand.randint(0, n-1)
-        u = rand.uniform(0, 1)
-        if u < prob[i]:
-            samples.append(i + 1)
-        else:
-            samples.append(alias_table[i] + 1)  
-    return samples
+    
+    i = rand.randint(0, n-1)
+    u = rand.uniform(0, 1)
+    if u < prob[i]:
+        return i + 1
+    else:
+        return alias_table[i] + 1  
 
 x = [7/48, 5/48, 1/8, 1/16, 1/4, 5/16]
 
 direct_values = [direct_method(x) for _ in range(SAMPLES)]
 rejection_values = [rejection(x) for _ in range(SAMPLES)]
-alias_values = [alias(x)]
+alias_values = [alias(x) for _ in range(SAMPLES)]
 # alias_values = [alias(x) for _ in range(SAMPLES)]
 
 fig, axs = plt.subplots(3)
