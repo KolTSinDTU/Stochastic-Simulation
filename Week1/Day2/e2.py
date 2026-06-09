@@ -28,19 +28,55 @@ def rejection(x):
         if x[I-1]/c >= u2:
             return I
 
-def alias(x):
-    pass
+def alias(probabilities):
+    n = len(probabilities)
+
+    alias_table = [0] * n
+    prob = [0] * n
+    scaled_prob = [p * n for p in probabilities]
+
+    small = []
+    large = []  
+    for i, sp in enumerate(scaled_prob):
+        if sp < 1:
+            small.append(i)
+        else:
+            large.append(i)
+    #robin hood loop 
+    while small and large:
+        s = small.pop()
+        l = large.pop()
+        prob[s] = scaled_prob[s]
+        alias_table[s] = l
+        scaled_prob[l] = (scaled_prob[l] + scaled_prob[s]) - 1      
+        if scaled_prob[l] < 1:
+            small.append(l)
+        else:
+            large.append(l) 
+    for i in large + small:
+        prob[i] = 1.0
+
+    samples = []
+    for _ in range(SAMPLES):
+        i = rand.randint(0, n-1)
+        u = rand.uniform(0, 1)
+        if u < prob[i]:
+            samples.append(i + 1)
+        else:
+            samples.append(alias_table[i] + 1)  
+    return samples
 
 x = [7/48, 5/48, 1/8, 1/16, 1/4, 5/16]
 
 direct_values = [direct_method(x) for _ in range(SAMPLES)]
 rejection_values = [rejection(x) for _ in range(SAMPLES)]
+alias_values = [alias(x)]
 # alias_values = [alias(x) for _ in range(SAMPLES)]
 
-fig, axs = plt.subplots(2)
+fig, axs = plt.subplots(3)
 axs[0].hist(direct_values)
 
 axs[1].hist(rejection_values)
 
-# axs[2].hist(alias_values)
+axs[2].hist(alias_values)
 plt.show()
