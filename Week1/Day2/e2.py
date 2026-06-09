@@ -71,10 +71,14 @@ rejection_values = [rejection(x) for _ in range(SAMPLES)]
 alias_values = [alias(x) for _ in range(SAMPLES)]
 # alias_values = [alias(x) for _ in range(SAMPLES)]
 
+# Plotting the histograms - add good titles and labels for clarity
 fig, axs = plt.subplots(3)
-axs[0].hist(direct_values)
-
-axs[1].hist(rejection_values)
-
-axs[2].hist(alias_values)
+axs[0].hist(direct_values, label="Direct Method", alpha=0.6)
+axs[1].hist(rejection_values, label="Rejection Method", alpha=0.6)
+axs[2].hist(alias_values, label="Alias Method", alpha=0.6)
+axs[0].legend() 
+axs[1].legend() 
+axs[2].legend() 
+axs[0].set_title("Comparisons of Sampling Methods")
+plt.tight_layout()
 plt.show()
