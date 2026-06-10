@@ -5,7 +5,7 @@ import random as rand
 import numpy as np
 import scipy.stats as stats
 
-SAMPLES = 100
+SAMPLES = 10_000
 
 
 def exp_distribution(lam):
