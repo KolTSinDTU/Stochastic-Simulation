@@ -1,4 +1,4 @@
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import random as rand
 import math
 import numpy as np
@@ -61,7 +61,7 @@ class Simulation:
             self.m += 1
 
     def get_blocking_fraction(self):
-        return self.customers_blocked / self.customers_arrived
+        return float(self.customers_blocked) / float(self.customers_arrived)
 
     def run(self):
         prev_time = 0
@@ -81,18 +81,19 @@ def analytical_blocking_fraction(m, lam, s):
     denominator = sum((A**k) / math.factorial(k) for k in range(m + 1))
     return numerator / denominator
 
+
 def confidence_interval(data, confidence=0.95):
     n = len(data)
     alpha = 1 - confidence
-    
+
     mean = np.mean(data)
     std_dev = np.std(data, ddof=1)
 
     t_critical = stats.t.ppf(1 - alpha / 2, df=n - 1)
-    
+
     # Calculate margin of error using the critical value, not the confidence percentage
     margin_of_error = t_critical * (std_dev / math.sqrt(n))
-    
+
     lower_ci = mean - margin_of_error
     upper_ci = mean + margin_of_error
     return float(lower_ci), float(upper_ci)
@@ -108,6 +109,32 @@ if __name__ == "__main__":
         sim = Simulation(m, service_rate, arrival_rate)
         sim.run()
         blocking_fractions.append(sim.get_blocking_fraction())
+
+    x_indices = np.arange(1, 11)  # X-axis values 1 to 10
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    # Plotting the line chart
+    ax.plot(
+        x_indices, blocking_fractions, marker="o", linestyle="-", color="b", linewidth=2
+    )
+
+    # Formatting axes
+    ax.set_xticks(x_indices)
+    ax.set_ylim(0.08, 0.17)
+    ax.axhline(
+        y=0.1216610642529515,
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label="Theoretical Blocking Fraction",
+    )
+    ax.set_xlabel("Index (1-10)")
+    ax.set_ylabel("Blocking Fraction")
+    ax.grid(True, linestyle="--", alpha=0.5)
+
+    plt.tight_layout()
+    plt.show()
 
     confidence_int = confidence_interval(blocking_fractions)
     print(f"confidence interval for blocking fraction: {confidence_int}")
