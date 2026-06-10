@@ -4,7 +4,7 @@ import random as rand
 import numpy as np
 import statistics as stats
 
-SAMPLES = 10_000
+SAMPLES = 100
 
 
 def exp_distribution(lam):
@@ -25,6 +25,12 @@ def box_muller():
 def pareto_distribution(beta, k):
     u = rand.random()
     return beta * (u ** (-1 / k))
+
+
+def pareto_composition(beta):
+    e1 = exp_distribution(beta)
+    e2 = exp_distribution(e1)
+    return e2
 
 
 def plot_exp_distribution(lam: float = 10, samples: int = SAMPLES):
@@ -63,6 +69,17 @@ def plot_pareto_distribution(
     x_values = np.linspace(beta, max(pareto_values), 1000)
     pdf_values = (k * (beta**k)) / (x_values ** (k + 1))
 
+    sampled_mean = stats.mean(pareto_values)
+    theoretical_mean = (k * beta) / (k - 1)
+
+    sampled_variance = stats.variance(pareto_values)
+    theoretical_variance = (k * (beta**2)) / ((k - 1) ** 2 * (k - 2))
+
+    print(f"Sampled Mean: {sampled_mean:.4f}, Theoretical Mean: {theoretical_mean:.4f}")
+    print(
+        f"Sampled Variance: {sampled_variance:.4f}, Theoretical Variance: {theoretical_variance:.4f}"
+    )
+
     axs.hist(pareto_values, bins=50, density=True, label=f"k={k}")
     axs.plot(x_values, pdf_values, "r-", linewidth=2)
     axs.legend()
@@ -72,15 +89,41 @@ def plot_pareto_distribution(
     # axs.show()
 
 
+def plot_pareto_composition():
+    beta = 1
+    k = 1
+    pareto_values_composition = [pareto_composition(beta) for _ in range(SAMPLES)]
+    pareto_values_direct = [pareto_distribution(beta, k) for _ in range(SAMPLES)]
+
+    plt.figure(figsize=(8, 5))
+
+    # Plot just the two histograms with transparency (alpha) and labels
+    plt.hist(pareto_values_composition, bins=50, density=True, alpha=0.6, label="Composition Method")
+    plt.hist(pareto_values_direct, bins=50, density=True, alpha=0.6, label="Inverse Method")
+
+    # Start the plot from x > beta
+    plt.xlim(left=beta)
+
+    # Add appropriate legends
+    plt.legend()
+
+    plt.title("Pareto Distribution: Composition vs Inverse Method")
+    plt.xlabel("Value")
+    plt.ylabel("Density")
+    plt.show()
+
+
 if __name__ == "__main__":
     # plot_exp_distribution()
     # plot_normal_distribution()
-    fig, axs = plt.subplots(4)
-    axs[0].set_title("Pareto Distribution with Different k Values")
+    # fig, axs = plt.subplots(1)
+    # # axs[0].set_title("Pareto Distribution with Different k Values")
 
-    plot_pareto_distribution(1, 2.05, SAMPLES, axs[0])
-    plot_pareto_distribution(1, 2.5, SAMPLES, axs[1])
-    plot_pareto_distribution(1, 3, SAMPLES, axs[2])
-    plot_pareto_distribution(1, 4, SAMPLES, axs[3])
-    plt.tight_layout()
-    plt.show()
+    # # plot_pareto_distribution(1, 2.05, SAMPLES, axs[0])
+    # # plot_pareto_distribution(1, 2.5, SAMPLES, axs[1])
+    # plot_pareto_distribution(1, 3, SAMPLES, axs)
+    # # plot_pareto_distribution(1, 4, SAMPLES, axs[3])
+    # plt.tight_layout()
+    # plt.show()
+
+    plot_pareto_composition()
