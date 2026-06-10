@@ -1,8 +1,9 @@
 import math
+from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 import random as rand
 import numpy as np
-import statistics as stats
+import scipy.stats as stats
 
 SAMPLES = 10_000
 
@@ -71,16 +72,75 @@ def plot_pareto_distribution(
     # axs.ylabel("Density")
     # axs.show()
 
+# For the normal distribution, generate 100 confidence intervals for:
+# the mean,
+# the variance.
+# Each confidence interval should be based on a sample of size n = 10, and all confidence
+# intervals should have confidence level 95%.
+# Present and discuss the results.
+
+def confidence_interval(data, confidence=0.95):
+    n = len(data)
+    alpha = 1 - confidence
+    
+    mean = np.mean(data)
+    std_dev = np.std(data, ddof=1)
+
+    t_critical = stats.t.ppf(1 - alpha / 2, df=n - 1)
+    
+    # Calculate margin of error using the critical value, not the confidence percentage
+    margin_of_error = t_critical * (std_dev / math.sqrt(n))
+    
+    lower_ci = mean - margin_of_error
+    upper_ci = mean + margin_of_error
+    return float(lower_ci), float(upper_ci)
 
 if __name__ == "__main__":
     # plot_exp_distribution()
     # plot_normal_distribution()
-    fig, axs = plt.subplots(4)
-    axs[0].set_title("Pareto Distribution with Different k Values")
+    # fig, axs = plt.subplots(4)
+    # axs[0].set_title("Pareto Distribution with Different k Values")
 
-    plot_pareto_distribution(1, 2.05, SAMPLES, axs[0])
-    plot_pareto_distribution(1, 2.5, SAMPLES, axs[1])
-    plot_pareto_distribution(1, 3, SAMPLES, axs[2])
-    plot_pareto_distribution(1, 4, SAMPLES, axs[3])
+    # plot_pareto_distribution(1, 2.05, SAMPLES, axs[0])
+    # plot_pareto_distribution(1, 2.5, SAMPLES, axs[1])
+    # plot_pareto_distribution(1, 3, SAMPLES, axs[2])
+    # plot_pareto_distribution(1, 4, SAMPLES, axs[3])
+    # plt.tight_layout()
+    # plt.show()
+
+    #plot confidence intervals for the normal distribution
+    confidence_intervals = []
+    for _ in range(100):
+        normal_data = [box_muller()[0] for _ in range(10)]
+        confidence_intervals.append(confidence_interval(normal_data))
+    
+    starts_box = [ci[0] for ci in confidence_intervals]
+    widths_box = [ci[1] - ci[0] for ci in confidence_intervals]
+
+    colors = []
+    miss_count = 0
+    for start, width in zip(starts_box, widths_box):
+        end = start + width
+        if start > 0 or end < 0:  # doesn't contain zero
+            colors.append('red')
+            miss_count += 1
+        else:
+            colors.append('blue')
+
+    
+    fig, axs = plt.subplots(1, figsize=(10, 6))
+
+    axs.barh(y=range(100), width=widths_box, left=starts_box, color=colors, alpha=0.5, label='Box-Muller')
+    axs.axvline(x=0, color='black', linewidth=1.5, linestyle='--', label='Zero')
+    legend_elements = [
+    Patch(facecolor='blue', alpha=0.5, label='Contains zero'),
+    Patch(facecolor='red', alpha=0.5, label=f'Misses zero (n={miss_count})'),
+    plt.Line2D([0], [0], color='black', linewidth=1.5, linestyle='--', label='Zero line')]
+    axs.legend(handles=legend_elements, loc='lower right')
+    axs.set_xlabel('Confidence Interval Range')
+    axs.set_title('Confidence Intervals for Normal Distribution')
+    
     plt.tight_layout()
     plt.show()
+
+    
