@@ -14,16 +14,43 @@ def exponential_distribution(lam):
     return -math.log(u) / lam
 
 
+def get_erlang(mean=1.0, k=1):
+    return rand.gammavariate(k, mean / k)
+
+
+def get_hyperexponential(p1=0.8, lambda1=0.8333, lambda2=5.0):
+    if rand.random() < p1:
+        return rand.expovariate(lambda1)
+    else:
+        return rand.expovariate(lambda2)
+
+
 class EventType:
     CustomerArrival = 1
     ServiceCompletion = 2
 
 
+class DistributionType:
+    Exponential = 1
+    Erlang = 2
+    Hyperexponential = 3
+    Constant = 4
+
+
 class Simulation:
-    def __init__(self, m, service_rate, arrival_rate):
+    def __init__(
+        self,
+        m,
+        service_rate,
+        arrival_rate,
+        distribution_type=DistributionType.Exponential,
+        k=4,
+    ):
         self.m = m
         self.service_rate = service_rate
         self.arrival_rate = arrival_rate
+        self.distribution_type = distribution_type
+        self.k = k
         self.current_time = 0
         self.event_queue = PriorityQueue()
         self.customers_blocked = 0
@@ -48,7 +75,15 @@ class Simulation:
         if event_type == EventType.CustomerArrival:
             # Server available
             if self.m > 0:
-                service_time = exponential_distribution(self.service_rate)
+                if self.distribution_type == DistributionType.Exponential:
+                    service_time = exponential_distribution(self.service_rate)
+                elif self.distribution_type == DistributionType.Erlang:
+                    service_time = get_erlang(mean=8.0, k=self.k)
+                elif self.distribution_type == DistributionType.Hyperexponential:
+                    service_time = get_hyperexponential()
+                elif self.distribution_type == DistributionType.Constant:
+                    service_time = 8.0
+
                 self.schedule_event(
                     self.current_time + service_time, EventType.ServiceCompletion
                 )
@@ -105,41 +140,47 @@ if __name__ == "__main__":
     arrival_rate = 1
 
     blocking_fractions = []
-    for _ in range(10):
-        sim = Simulation(m, service_rate, arrival_rate)
+    simulation1 = Simulation(m, service_rate, arrival_rate, DistributionType.Constant)
+    simulation2 = Simulation(
+        m, service_rate, arrival_rate, DistributionType.Erlang, k=1.05
+    )
+    simulation3 = Simulation(
+        m, service_rate, arrival_rate, DistributionType.Erlang, k=2.05
+    )
+    simulation4 = Simulation(
+        m, service_rate, arrival_rate, DistributionType.Exponential
+    )
+    simulations = [simulation1, simulation2, simulation3, simulation4]
+
+    for sim in simulations:
         sim.run()
         blocking_fractions.append(sim.get_blocking_fraction())
 
-    x_indices = np.arange(1, 11)  # X-axis values 1 to 10
+    labels = ["Constant", "Erlang-1.05", "Erlang-2.05", "Exponential"]
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-
-    # Plotting the line chart
-    ax.plot(
-        x_indices, blocking_fractions, marker="o", linestyle="-", color="b", linewidth=2
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(
+        labels,
+        blocking_fractions,
+        capsize=10,
+        color=["skyblue", "lightgreen", "salmon", "lightcoral"],
     )
 
-    # Formatting axes
-    ax.set_xticks(x_indices)
-    ax.set_ylim(0.08, 0.17)
-    ax.axhline(
-        y=0.1216610642529515,
-        color="red",
-        linestyle="--",
-        linewidth=2,
-        label="Theoretical Blocking Fraction",
-    )
-    ax.set_xlabel("Index (1-10)")
-    ax.set_ylabel("Blocking Fraction")
-    ax.grid(True, linestyle="--", alpha=0.5)
+    plt.ylabel("Fraction of Blocked Customers")
+    plt.title("Comparison of Service Distributions (Mean Inter-arrival Time = 8.0)")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+
+    # Add values on top of bars
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            yval + 0.002,
+            f"{yval:.4f}",
+            ha="center",
+            va="bottom",
+            fontweight="bold",
+        )
 
     plt.tight_layout()
     plt.show()
-
-    confidence_int = confidence_interval(blocking_fractions)
-    print(f"confidence interval for blocking fraction: {confidence_int}")
-    print(f"Estimated Blocking Fraction: {np.mean(blocking_fractions):.4f}")
-    print(f"Estimated variance: {np.var(blocking_fractions, ddof=1):.8f}")
-    print(
-        f"Analytical Blocking Fraction: {analytical_blocking_fraction(m, arrival_rate, 1/service_rate)}"
-    )

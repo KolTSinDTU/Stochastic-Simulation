@@ -28,6 +28,8 @@ class Simulation:
         self.event_queue = PriorityQueue()
         self.customers_blocked = 0
         self.customers_arrived = 0
+        self.service_times = []
+        self.inter_arrival_times = []
 
     def schedule_event(self, event_time, event_type):
         self.event_queue.put((event_time, event_type))
@@ -36,6 +38,7 @@ class Simulation:
         if arrival_time is None:
             arrival_time = exponential_distribution(self.arrival_rate)
         self.schedule_event(arrival_time, EventType.CustomerArrival)
+        self.inter_arrival_times.append(arrival_time)
 
     def process_event(self):
         event_time, event_type = self.event_queue.get()
@@ -52,6 +55,7 @@ class Simulation:
                 self.schedule_event(
                     self.current_time + service_time, EventType.ServiceCompletion
                 )
+                self.service_times.append(service_time)
                 self.m -= 1
 
             else:
@@ -62,6 +66,12 @@ class Simulation:
 
     def get_blocking_fraction(self):
         return float(self.customers_blocked) / float(self.customers_arrived)
+
+    def get_mean_service_time(self):
+        return np.mean(self.service_times)
+
+    def get_mean_inter_arrival_time(self):
+        return np.mean(self.inter_arrival_times)
 
     def run(self):
         prev_time = 0
@@ -99,47 +109,64 @@ def confidence_interval(data, confidence=0.95):
     return float(lower_ci), float(upper_ci)
 
 
+def get_covariance(x, y):
+    n = len(x)
+    mean_x = np.mean(x)
+    mean_y = np.mean(y)
+    covariance = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n)) / (n - 1)
+    return covariance
+
+
 if __name__ == "__main__":
     m = 10
     service_rate = 1 / 8
     arrival_rate = 1
 
     blocking_fractions = []
+    avg_service_times = []
+    avg_inter_arrival_times = []
     for _ in range(10):
         sim = Simulation(m, service_rate, arrival_rate)
         sim.run()
         blocking_fractions.append(sim.get_blocking_fraction())
-
-    x_indices = np.arange(1, 11)  # X-axis values 1 to 10
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-
-    # Plotting the line chart
-    ax.plot(
-        x_indices, blocking_fractions, marker="o", linestyle="-", color="b", linewidth=2
-    )
-
-    # Formatting axes
-    ax.set_xticks(x_indices)
-    ax.set_ylim(0.08, 0.17)
-    ax.axhline(
-        y=0.1216610642529515,
-        color="red",
-        linestyle="--",
-        linewidth=2,
-        label="Theoretical Blocking Fraction",
-    )
-    ax.set_xlabel("Index (1-10)")
-    ax.set_ylabel("Blocking Fraction")
-    ax.grid(True, linestyle="--", alpha=0.5)
-
-    plt.tight_layout()
-    plt.show()
+        avg_service_times.append(sim.get_mean_service_time())
+        avg_inter_arrival_times.append(sim.get_mean_inter_arrival_time())
 
     confidence_int = confidence_interval(blocking_fractions)
-    print(f"confidence interval for blocking fraction: {confidence_int}")
-    print(f"Estimated Blocking Fraction: {np.mean(blocking_fractions):.4f}")
-    print(f"Estimated variance: {np.var(blocking_fractions, ddof=1):.8f}")
     print(
-        f"Analytical Blocking Fraction: {analytical_blocking_fraction(m, arrival_rate, 1/service_rate)}"
+        f"Analytical Blocking Fraction: {analytical_blocking_fraction(m, arrival_rate, 1/service_rate)} \n"
+    )
+    print(f"Confidence interval for crude estimate: {confidence_int}")
+    print(f"Variance: {np.var(blocking_fractions, ddof=1):.8f} \n")
+
+    covariance_service = get_covariance(blocking_fractions, avg_service_times)
+    var_service_times = np.var(avg_service_times, ddof=1)
+    c = -covariance_service / var_service_times
+    control_variate_estimates = [
+        blocking_fractions[i] + c * (avg_service_times[i] - 8)
+        for i in range(len(blocking_fractions))
+    ]
+
+    ci_lower, ci_upper = confidence_interval(control_variate_estimates)
+    # print(f"Estimated Mean (Control Variate): {np.mean(control_variate_estimates):.4f}")
+    print(
+        f"Confidence Interval with service times as control variates: [{ci_lower:.4f}, {ci_upper:.4f}]"
+    )
+    print(
+        f"Variance with control variates: {np.var(control_variate_estimates, ddof=1):.8f} \n"
+    )
+
+    covariance_arrivals = get_covariance(blocking_fractions, avg_inter_arrival_times)
+    var_inter_arrival_times = np.var(avg_inter_arrival_times, ddof=1)
+    c = -covariance_arrivals / var_inter_arrival_times
+    control_variate_estimates = [
+        blocking_fractions[i] + c * (avg_inter_arrival_times[i] - 8)
+        for i in range(len(blocking_fractions))
+    ]
+
+    print(
+        f"Confidence Interval with inter-arrival times as control variates: [{ci_lower:.4f}, {ci_upper:.4f}]"
+    )
+    print(
+        f"Variance with control variates (inter-arrival times): {np.var(control_variate_estimates, ddof=1):.8f}"
     )
