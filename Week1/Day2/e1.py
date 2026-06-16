@@ -15,49 +15,56 @@ import matplotlib.pyplot as plt
 SAMPLES = 10_000
 
 
-def generate_geom(p):
+def generate_geometric(p_value):
+    # 1. Generate a uniform random number
     u = rand.uniform(0, 1)
-    return math.floor(math.log(u) / math.log(1 - p)) + 1
+    
+    # 2. Apply inverse transform method for geometric distribution
+    return math.floor(math.log(u) / math.log(1 - p_value)) + 1
 
 
-small = 0.01
-medium = 0.6
-large = 0.98
+if __name__ == "__main__":
+    # 1. Define probability parameters
+    p_small = 0.01
+    p_medium = 0.6
+    p_large = 0.98
 
+    # 2. Generate samples using NumPy for comparison
+    numpy_small = [np.random.geometric(p_small) for _ in range(SAMPLES)]
+    numpy_medium = [np.random.geometric(p_medium) for _ in range(SAMPLES)]
+    numpy_large = [np.random.geometric(p_large) for _ in range(SAMPLES)]
 
-import numpy as np
-import matplotlib.pyplot as plt
+    # 3. Generate samples using custom simulation
+    simulated_small = [generate_geometric(p_small) for _ in range(SAMPLES)]
+    simulated_medium = [generate_geometric(p_medium) for _ in range(SAMPLES)]
+    simulated_large = [generate_geometric(p_large) for _ in range(SAMPLES)]
 
-# Assuming SAMPLES, small, medium, large, and generate_geom are defined above
+    # 4. Visualize results
+    fig, axs = plt.subplots(3, 1, figsize=(10, 12))
 
-small_geom = [np.random.geometric(small) for _ in range(SAMPLES)]
-medium_geom = [np.random.geometric(medium) for _ in range(SAMPLES)]
-large_geom = [np.random.geometric(large) for _ in range(SAMPLES)]
+    # Subplot 1: Small p-value
+    axs[0].hist(numpy_small, label="NumPy Geometric", alpha=0.6, color='#2c3e50')
+    axs[0].hist(simulated_small, label="Simulated Geometric", alpha=0.6, color='#e74c3c')
+    axs[0].set_title(f"--- Results: Small p-value (p = {p_small}) ---")
+    axs[0].grid(True, linestyle='--', alpha=0.7)
+    axs[0].legend()
 
-small_sim_geom = [generate_geom(small) for _ in range(SAMPLES)]
-medium_sim_geom = [generate_geom(medium) for _ in range(SAMPLES)]
-large_sim_geom = [generate_geom(large) for _ in range(SAMPLES)]
+    # Subplot 2: Medium p-value
+    axs[1].hist(numpy_medium, label="NumPy Geometric", alpha=0.6, color='#2c3e50')
+    axs[1].hist(simulated_medium, label="Simulated Geometric", alpha=0.6, color='#e74c3c')
+    axs[1].set_title(f"--- Results: Medium p-value (p = {p_medium}) ---")
+    axs[1].grid(True, linestyle='--', alpha=0.7)
+    axs[1].legend()
 
-fig, axs = plt.subplots(3)
+    # Subplot 3: Large p-value
+    axs[2].hist(numpy_large, label="NumPy Geometric", alpha=0.6, color='#2c3e50')
+    axs[2].hist(simulated_large, label="Simulated Geometric", alpha=0.6, color='#e74c3c')
+    axs[2].set_title(f"--- Results: Large p-value (p = {p_large}) ---")
+    axs[2].grid(True, linestyle='--', alpha=0.7)
+    axs[2].legend()
 
-# Subplot 1
-axs[0].hist(small_geom, label="Numpy Geometric", alpha=0.6)
-axs[0].hist(small_sim_geom, label="Simulated Geometric", alpha=0.6)
-axs[0].set_title(f"Small p-value (p = {small})")
-axs[0].legend()
+    print(f"--- Simulation Complete ---")
+    print(f"Generated {SAMPLES} samples for each p-value.")
 
-# Subplot 2
-axs[1].hist(medium_geom, label="Numpy Geometric", alpha=0.6)
-axs[1].hist(medium_sim_geom, label="Simulated Geometric", alpha=0.6)
-axs[1].set_title(f"Medium p-value (p = {medium})")
-axs[1].legend()
-
-# Subplot 3
-axs[2].hist(large_geom, label="Numpy Geometric", alpha=0.6)
-axs[2].hist(large_sim_geom, label="Simulated Geometric", alpha=0.6)
-axs[2].set_title(f"Large p-value (p = {large})")
-axs[2].legend()
-
-# Optional but recommended: layout adjustment to prevent overlapping text
-plt.tight_layout()
-plt.show()
+    plt.tight_layout()
+    plt.show()

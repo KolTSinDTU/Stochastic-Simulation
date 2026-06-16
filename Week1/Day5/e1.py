@@ -2,123 +2,140 @@ import random as rand
 import matplotlib.pyplot as plt
 import numpy as np
 import math
-from scipy import stats
 
 
-def trunc_poisson(i, A):
-    return (A**i) / math.factorial(i)
+def calculate_truncated_poisson_weight(k, offered_load):
+    # 1. Calculate unnormalized Poisson weight
+    return (offered_load**k) / math.factorial(k)
 
 
-def erling(A, k=1):
-    return rand.gammavariate(A, k)
-    # return stats.erlang.rvs([k], scale=1 / A)
+def generate_erlang_sample(offered_load, k=1):
+    # 1. Generate sample from Gamma/Erlang distribution
+    return rand.gammavariate(offered_load, k)
 
 
-def propose_next_state(i, m):
+def propose_next_state(current_state, max_capacity):
+    # 1. Propose increment or decrement with equal probability
     u = rand.random()
     if u < 0.5:
-        return max(0, i - 1)
+        return max(0, current_state - 1)
     else:
-        return min(m, i + 1)
+        return min(max_capacity, current_state + 1)
 
 
-# Returns the next state and whether the move was accepted or not
-def next_state(x, A, m):
-    g_x = trunc_poisson(x, A)
-    y = propose_next_state(x, m)
-    g_y = trunc_poisson(y, A)
+def get_next_metropolis_state(current_state, offered_load, max_capacity):
+    # 1. Calculate weights for current and proposed states
+    current_weight = calculate_truncated_poisson_weight(current_state, offered_load)
+    proposed_state = propose_next_state(current_state, max_capacity)
+    proposed_weight = calculate_truncated_poisson_weight(proposed_state, offered_load)
 
-    alpha = min(1, g_y / g_x)
+    # 2. Calculate acceptance probability
+    acceptance_ratio = min(1, proposed_weight / current_weight)
 
-    if alpha == 1:
-        return y
+    # 3. Accept or reject based on ratio
+    if acceptance_ratio == 1:
+        return proposed_state
     else:
         u = rand.random()
-        if u < alpha:
-            return y
+        if u < acceptance_ratio:
+            return proposed_state
         else:
-            return x
+            return current_state
 
 
-def simulate(A, m):
-    states = []
-
-    # Start from an arbitrary state, e.g., 0
+def run_mcmc_simulation(offered_load, max_capacity):
+    # 1. Initialize simulation parameters
+    state_history = []
     current_state = 0
+    total_steps = 3000
+    burn_in = 800
 
-    for _ in range(3000):
-        next_state_val = next_state(current_state, A, m)
-        states.append(next_state_val)
-        current_state = next_state_val
+    # 2. Run Markov Chain iteration
+    for _ in range(total_steps):
+        current_state = get_next_metropolis_state(current_state, offered_load, max_capacity)
+        state_history.append(current_state)
 
-    return states[800:]
-
-
-def chi_squared(samples, actual, m):
-    T = 0
-    for i in range(len(actual)):
-        diff = samples[i] - actual[i]
-        T += (diff**2) / actual[i] if actual[i] > 0 else 0
-
-    return T
+    # 3. Return results after removing burn-in period
+    return state_history[burn_in:]
 
 
-def calculate_c(A, m):
-    total = sum(A**i / math.factorial(i) for i in range(m + 1))
-    return 1 / total
+def calculate_chi_squared(observed_probs, expected_probs):
+    # 1. Calculate Chi-squared statistic for goodness of fit
+    statistic = 0
+    for i in range(len(expected_probs)):
+        if expected_probs[i] > 0:
+            diff = observed_probs[i] - expected_probs[i]
+            statistic += (diff**2) / expected_probs[i]
+    return statistic
 
 
-def theoretical_probs(A, m):
-    c = calculate_c(A, m)
-    return [c * (A**i) / math.factorial(i) for i in range(m + 1)]
+def get_theoretical_probabilities(offered_load, max_capacity):
+    # 1. Calculate normalization constant for truncated Poisson
+    total_weight = sum(offered_load**i / math.factorial(i) for i in range(max_capacity + 1))
+    normalization_c = 1 / total_weight
+    # 2. Return normalized probabilities
+    return [normalization_c * (offered_load**i) / math.factorial(i) for i in range(max_capacity + 1)]
 
 
-def simulation_probs(samples, m):
+def get_simulation_probabilities(samples, max_capacity):
+    # 1. Calculate empirical distribution from samples
     total_samples = len(samples)
-    return [samples.count(i) / total_samples for i in range(m + 1)]
+    return [samples.count(i) / total_samples for i in range(max_capacity + 1)]
 
 
-def plot(samples, actual, m):
-    plt.bar(
-        range(m + 1),
-        actual,
-        alpha=0.5,
+def plot_distribution_comparison(samples, theoretical_probs, max_capacity):
+    # 1. Initialize plot and figure
+    fig, ax = plt.subplots(figsize=(10, 6))
+    x_indices = np.arange(max_capacity + 1)
+    empirical_probs = get_simulation_probabilities(samples, max_capacity)
+
+    # 2. Plot theoretical and empirical bars
+    ax.bar(
+        x_indices,
+        theoretical_probs,
+        alpha=0.6,
         label="Theoretical Probabilities",
-        color="blue",
+        color="#2c3e50",
     )
 
-    plt.bar(
-        range(m + 1),
-        simulation_probs(samples, m),
-        alpha=0.5,
+    ax.bar(
+        x_indices,
+        empirical_probs,
+        alpha=0.6,
         label="Simulated Probabilities",
-        color="red",
+        color="#e74c3c",
     )
 
-    # Formatting the plot
-    plt.xlim(left=0)  # Erlang distribution is only defined for x >= 0
-    plt.xlabel("Value")
-    plt.ylabel("Probability Density")
-    plt.title("Comparison of sampled and theoretical distributions")
-    plt.legend(loc="upper right")
-    plt.grid(axis="y", linestyle="--", alpha=0.5)
-
+    # 3. Style and format the chart
+    ax.set_xlabel("State (k)")
+    ax.set_ylabel("Probability")
+    ax.set_title("MCMC Simulation vs. Theoretical Truncated Poisson Distribution")
+    ax.legend(loc="upper right")
+    ax.grid(True, linestyle="--", alpha=0.7)
+    
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    A = 8
-    m = 10
-    simulations = simulate(A, m)
-    actual_probs = theoretical_probs(A, m)
+    # 1. Setup configuration
+    offered_load_val = 8
+    max_capacity_val = 10
+    
+    # 2. Execute simulation and theoretical calculations
+    simulation_results = run_mcmc_simulation(offered_load_val, max_capacity_val)
+    theoretical_probs_val = get_theoretical_probabilities(offered_load_val, max_capacity_val)
+    empirical_probs_val = get_simulation_probabilities(simulation_results, max_capacity_val)
 
-    plot(simulations, actual_probs, m)
-    print(f"Actual probabilities: {actual_probs}")
-    print(f"Simulated probabilities: {simulation_probs(simulations, m)}")
-
-    print(
-        f"Chi-squared statistic: {chi_squared(simulation_probs(simulations, m), actual_probs, m + 1)}"
-    )
-
-    # print(f"Chi-squared statistic: {chi_squared(simulations, actual_probs, m + 1)}")
+    # 3. Visualize results
+    plot_distribution_comparison(simulation_results, theoretical_probs_val, max_capacity_val)
+    
+    # 4. Display numerical results
+    print(f"--- Distribution Analysis ---")
+    print(f"Theoretical Probabilities: {[round(p, 4) for p in theoretical_probs_val]}")
+    print(f"Simulated Probabilities: {[round(p, 4) for p in empirical_probs_val]}")
+    print()
+    
+    chi_stat = calculate_chi_squared(empirical_probs_val, theoretical_probs_val)
+    print(f"--- Statistical Tests ---")
+    print(f"Chi-squared statistic: {chi_stat:.6f}")

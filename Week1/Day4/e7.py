@@ -1,58 +1,70 @@
 import random as rand
-import statistics as stats
 import numpy as np
-import scipy
 import math
-import matplotlib.pyplot as plt
 
-SAMPLES = 1000
+SAMPLES_COUNT = 1000
 
 
-def standard_normal():
+def get_standard_normal_sample():
+    # 1. Return a sample from standard normal distribution
     return rand.gauss(0, 1)
 
 
-def exponential_distribution(lam):
+def generate_exponential_sample(lambda_param):
+    # 1. Generate random uniform
     u = rand.random()
-    return -math.log(u) / lam
+    # 2. Return exponential sample
+    return -math.log(u) / lambda_param
 
 
-def crude_estimate(a):
-    count = 0
-    for _ in range(SAMPLES):
-        if standard_normal() > a:
-            count += 1
-    return float(count / SAMPLES)
+def calculate_crude_estimate(threshold):
+    # 1. Initialize counter
+    success_count = 0
+    # 2. Perform trials
+    for _ in range(SAMPLES_COUNT):
+        if get_standard_normal_sample() > threshold:
+            success_count += 1
+    # 3. Return fraction
+    return float(success_count / SAMPLES_COUNT)
 
 
-def importance_sampling_estimate(a):
-    estimates = []
-    for _ in range(SAMPLES):
-        y = rand.gauss(a, 1)
-        if y < a:
-            estimates.append(0)
+def calculate_importance_sampling_estimate(threshold):
+    # 1. Initialize estimates list
+    trial_estimates = []
+    # 2. Perform importance sampling
+    for _ in range(SAMPLES_COUNT):
+        # Sample from shifted distribution (mean = threshold)
+        y_sample = rand.gauss(threshold, 1)
+        if y_sample < threshold:
+            trial_estimates.append(0)
         else:
-            estimates.append(math.exp((a**2) / 2 - a * y))
-    mean_estimate = np.mean(estimates)
-    return mean_estimate
+            trial_estimates.append(math.exp((threshold**2) / 2 - threshold * y_sample))
+    # 3. Return mean of estimates
+    return np.mean(trial_estimates)
 
 
 if __name__ == "__main__":
-    a = 3
+    threshold_value = 3
 
-    print("Crude Monte Carlo Estimation:")
-    crude_estimates = [crude_estimate(a) for _ in range(10)]
-    mean_crude = np.mean(crude_estimates)
-    vars_crude = np.var(crude_estimates, ddof=1)
-    print(f"Estimated Mean Crude: {mean_crude}")
-    print(f"Estimated Variance Crude: {vars_crude}")
+    # 1. Crude Monte Carlo
+    print(f"--- Crude Monte Carlo Results ---")
+    crude_results = [calculate_crude_estimate(threshold_value) for _ in range(10)]
+    mean_crude = np.mean(crude_results)
+    variance_crude = np.var(crude_results, ddof=1)
+    print(f"Estimated Mean: {mean_crude:.6f}")
+    print(f"Estimated Variance: {variance_crude:.8f}")
+    print()
 
-    print("\nImportance Sampling Estimation:")
-    is_estimates = [importance_sampling_estimate(a) for _ in range(10)]
-    mean_is = np.mean(is_estimates)
-    vars_is = np.var(is_estimates, ddof=1)
-    print(f"Estimated Mean IS: {mean_is}")
-    print(f"Estimated Variance IS: {vars_is:.10f}")
+    # 2. Importance Sampling
+    print(f"--- Importance Sampling Results ---")
+    is_results = [calculate_importance_sampling_estimate(threshold_value) for _ in range(10)]
+    mean_is = np.mean(is_results)
+    variance_is = np.var(is_results, ddof=1)
+    print(f"Estimated Mean: {mean_is:.6f}")
+    print(f"Estimated Variance: {variance_is:.10f}")
+    print()
 
-    print("\nVariance Reduction:")
-    print(f"Variance Reduction: {vars_crude / vars_is:.10f}")
+    # 3. Summary
+    print(f"--- Variance Reduction Summary ---")
+    reduction_factor = variance_crude / variance_is if variance_is > 0 else 0
+    print(f"Variance Reduction Factor: {reduction_factor:.4f}")

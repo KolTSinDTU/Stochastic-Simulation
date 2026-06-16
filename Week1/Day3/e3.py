@@ -3,22 +3,25 @@ import random as rand
 import math
 import numpy as np
 from queue import PriorityQueue
-
 from scipy import stats
 
 SAMPLES = 10_000
 
 
 def exponential_distribution(lam):
+    # 1. Generate a uniform random number
     u = rand.random()
+    # 2. Apply inverse transform for exponential distribution
     return -math.log(u) / lam
 
 
 def get_erlang(mean=1.0, k=1):
+    # 1. Generate Erlang distributed value using gamma distribution
     return rand.gammavariate(k, mean / k)
 
 
 def get_hyperexponential(p1=0.8, lambda1=0.8333, lambda2=5.0):
+    # 1. Randomly select between two exponential distributions
     if rand.random() < p1:
         return rand.expovariate(lambda1)
     else:
@@ -40,147 +43,124 @@ class DistributionType:
 class Simulation:
     def __init__(
         self,
-        m,
+        num_servers,
         service_rate,
         arrival_rate,
         distribution_type=DistributionType.Exponential,
-        k=4,
+        k_parameter=4,
     ):
-        self.m = m
+        self.num_servers = num_servers
         self.service_rate = service_rate
         self.arrival_rate = arrival_rate
         self.distribution_type = distribution_type
-        self.k = k
+        self.k_parameter = k_parameter
         self.current_time = 0
         self.event_queue = PriorityQueue()
         self.customers_blocked = 0
         self.customers_arrived = 0
 
     def schedule_event(self, event_time, event_type):
+        # 1. Add event to priority queue
         self.event_queue.put((event_time, event_type))
 
     def add_customer_arrival(self, arrival_time=None):
+        # 1. Determine arrival time
         if arrival_time is None:
             arrival_time = exponential_distribution(self.arrival_rate)
+        # 2. Schedule arrival event
         self.schedule_event(arrival_time, EventType.CustomerArrival)
 
     def process_event(self):
+        # 1. Retrieve next event
         event_time, event_type = self.event_queue.get()
         self.current_time = event_time
 
-        # print(
-        #     f"Processing event at time {self.current_time:.2f}, type: {event_type} and m = {self.m}"
-        # )
-
+        # 2. Handle event based on type
         if event_type == EventType.CustomerArrival:
-            # Server available
-            if self.m > 0:
+            if self.num_servers > 0:
                 if self.distribution_type == DistributionType.Exponential:
-                    service_time = exponential_distribution(self.service_rate)
+                    service_duration = exponential_distribution(self.service_rate)
                 elif self.distribution_type == DistributionType.Erlang:
-                    service_time = get_erlang(mean=8.0, k=self.k)
+                    service_duration = get_erlang(mean=8.0, k=self.k_parameter)
                 elif self.distribution_type == DistributionType.Hyperexponential:
-                    service_time = get_hyperexponential()
+                    service_duration = get_hyperexponential()
                 elif self.distribution_type == DistributionType.Constant:
-                    service_time = 8.0
+                    service_duration = 8.0
 
                 self.schedule_event(
-                    self.current_time + service_time, EventType.ServiceCompletion
+                    self.current_time + service_duration, EventType.ServiceCompletion
                 )
-                self.m -= 1
-
+                self.num_servers -= 1
             else:
                 self.customers_blocked += 1
 
         elif event_type == EventType.ServiceCompletion:
-            self.m += 1
+            self.num_servers += 1
 
     def get_blocking_fraction(self):
+        # 1. Calculate and return blocking fraction
         return float(self.customers_blocked) / float(self.customers_arrived)
 
-    def run(self):
-        prev_time = 0
+    def run_simulation(self):
+        # 1. Generate arrival events
+        previous_arrival_time = 0
         for _ in range(SAMPLES):
             inter_arrival_time = exponential_distribution(self.arrival_rate)
-            self.add_customer_arrival(prev_time + inter_arrival_time)
-            prev_time += inter_arrival_time
+            self.add_customer_arrival(previous_arrival_time + inter_arrival_time)
+            previous_arrival_time += inter_arrival_time
             self.customers_arrived += 1
 
+        # 2. Process all events in queue
         while not self.event_queue.empty():
             self.process_event()
 
 
-def analytical_blocking_fraction(m, lam, s):
-    A = lam * s
-    numerator = A**m / math.factorial(m)
-    denominator = sum((A**k) / math.factorial(k) for k in range(m + 1))
-    return numerator / denominator
-
-
-def confidence_interval(data, confidence=0.95):
-    n = len(data)
-    alpha = 1 - confidence
-
-    mean = np.mean(data)
-    std_dev = np.std(data, ddof=1)
-
-    t_critical = stats.t.ppf(1 - alpha / 2, df=n - 1)
-
-    # Calculate margin of error using the critical value, not the confidence percentage
-    margin_of_error = t_critical * (std_dev / math.sqrt(n))
-
-    lower_ci = mean - margin_of_error
-    upper_ci = mean + margin_of_error
-    return float(lower_ci), float(upper_ci)
-
-
 if __name__ == "__main__":
-    m = 10
+    # 1. Configure simulation parameters
+    num_servers = 10
     service_rate = 1 / 8
     arrival_rate = 1
 
-    blocking_fractions = []
-    simulation1 = Simulation(m, service_rate, arrival_rate, DistributionType.Constant)
-    simulation2 = Simulation(
-        m, service_rate, arrival_rate, DistributionType.Erlang, k=1.05
-    )
-    simulation3 = Simulation(
-        m, service_rate, arrival_rate, DistributionType.Erlang, k=2.05
-    )
-    simulation4 = Simulation(
-        m, service_rate, arrival_rate, DistributionType.Exponential
-    )
-    simulations = [simulation1, simulation2, simulation3, simulation4]
+    # 2. Initialize simulations with different distributions
+    blocking_results = []
+    sim_configs = [
+        Simulation(num_servers, service_rate, arrival_rate, DistributionType.Constant),
+        Simulation(num_servers, service_rate, arrival_rate, DistributionType.Erlang, k_parameter=1.05),
+        Simulation(num_servers, service_rate, arrival_rate, DistributionType.Erlang, k_parameter=2.05),
+        Simulation(num_servers, service_rate, arrival_rate, DistributionType.Exponential)
+    ]
 
-    for sim in simulations:
-        sim.run()
-        blocking_fractions.append(sim.get_blocking_fraction())
+    # 3. Execute simulations
+    for simulation in sim_configs:
+        simulation.run_simulation()
+        blocking_results.append(simulation.get_blocking_fraction())
 
+    # 4. Visualize results
     labels = ["Constant", "Erlang-1.05", "Erlang-2.05", "Exponential"]
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    colors = ['#2c3e50', '#34495e', '#7f8c8d', '#e74c3c']
+    bars = ax.bar(labels, blocking_results, color=colors, alpha=0.8)
 
-    plt.figure(figsize=(10, 6))
-    bars = plt.bar(
-        labels,
-        blocking_fractions,
-        capsize=10,
-        color=["skyblue", "lightgreen", "salmon", "lightcoral"],
-    )
+    ax.set_ylabel("Fraction of Blocked Customers")
+    ax.set_title("--- Results: Comparison of Service Distributions ---")
+    ax.grid(True, axis="y", linestyle="--", alpha=0.7)
 
-    plt.ylabel("Fraction of Blocked Customers")
-    plt.title("Comparison of Service Distributions (Mean Inter-arrival Time = 8.0)")
-    plt.grid(axis="y", linestyle="--", alpha=0.7)
-
-    # Add values on top of bars
+    # Add value labels on top of bars
     for bar in bars:
-        yval = bar.get_height()
-        plt.text(
+        height = bar.get_height()
+        ax.text(
             bar.get_x() + bar.get_width() / 2,
-            yval + 0.002,
-            f"{yval:.4f}",
+            height + 0.001,
+            f"{height:.4f}",
             ha="center",
             va="bottom",
-            fontweight="bold",
+            fontweight="bold"
         )
+
+    print(f"--- Simulation Complete ---")
+    for label, fraction in zip(labels, blocking_results):
+        print(f"{label}: {fraction:.4f}")
 
     plt.tight_layout()
     plt.show()

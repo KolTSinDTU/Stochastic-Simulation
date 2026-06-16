@@ -4,36 +4,48 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 
-SAMPLES = 100
+SAMPLES_PER_ESTIMATE = 100
+NUM_ESTIMATES = 20
 
-def estimate_exp():
+def estimate_exponential_function():
+    # 1. Generate uniform random variable
     u = rand.random()
+    # 2. Return exponential transformation
     return math.exp(u)
 
-def confidence_interval(data, confidence=0.95):
-    n = len(data)
-    alpha = 1 - confidence
+def calculate_confidence_interval(data, confidence_level=0.95):
+    # 1. Initialize parameters
+    num_samples = len(data)
+    significance_alpha = 1 - confidence_level
 
-    mean = np.mean(data)
-    std_dev = np.std(data, ddof=1)
+    # 2. Calculate statistics
+    sample_mean = np.mean(data)
+    sample_std_deviation = np.std(data, ddof=1)
 
-    t_critical = stats.t.ppf(1 - alpha / 2, df=n - 1)
+    # 3. Determine critical value and margin of error
+    t_critical_value = stats.t.ppf(1 - significance_alpha / 2, df=num_samples - 1)
+    margin_of_error = t_critical_value * (sample_std_deviation / math.sqrt(num_samples))
 
-    # Calculate margin of error using the critical value, not the confidence percentage
-    margin_of_error = t_critical * (std_dev / math.sqrt(n))
-
-    lower_ci = mean - margin_of_error
-    upper_ci = mean + margin_of_error
-    return float(lower_ci), float(upper_ci)
+    # 4. Calculate and return interval bounds
+    lower_bound = sample_mean - margin_of_error
+    upper_bound = sample_mean + margin_of_error
+    return float(lower_bound), float(upper_bound)
 
 def get_mean_estimate():
-    estimates = [estimate_exp() for _ in range(SAMPLES)]
-    mean_estimate = np.mean(estimates)
-    return mean_estimate
+    # 1. Generate multiple estimates
+    sample_estimates = [estimate_exponential_function() for _ in range(SAMPLES_PER_ESTIMATE)]
+    # 2. Calculate and return mean
+    return np.mean(sample_estimates)
 
 if __name__ == "__main__":
-    estimates = [get_mean_estimate() for _ in range(20)]
-    mean_of_estimates = np.mean(estimates)
-    ci_lower, ci_upper = confidence_interval(estimates)
-    print(f"Estimated Mean: {mean_of_estimates:.4f}")
-    print(f"95% Confidence Interval: [{ci_lower:.4f}, {ci_upper:.4f}]")
+    # 1. Generate collection of mean estimates
+    mean_estimates_list = [get_mean_estimate() for _ in range(NUM_ESTIMATES)]
+    
+    # 2. Calculate overall statistics
+    overall_mean = np.mean(mean_estimates_list)
+    confidence_lower, confidence_upper = calculate_confidence_interval(mean_estimates_list)
+    
+    # 3. Output results
+    print(f"--- Results: Monte Carlo Estimation ---")
+    print(f"Estimated Mean: {overall_mean:.4f}")
+    print(f"95% Confidence Interval: [{confidence_lower:.4f}, {confidence_upper:.4f}]")
