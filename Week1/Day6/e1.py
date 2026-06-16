@@ -3,11 +3,9 @@ import random
 import matplotlib.pyplot as plt
 
 def calculate_euclidean_distance(point1, point2):
-    """Calculates the Euclidean distance between two (x, y) coordinates."""
     return math.hypot(point1[0] - point2[0], point1[1] - point2[1])
 
 def calculate_total_route_cost(points, route):
-    """Calculates the total distance of the current route, returning to the start."""
     total_distance = 0
     num_points = len(route)
     for i in range(num_points):
@@ -17,14 +15,12 @@ def calculate_total_route_cost(points, route):
     return total_distance
 
 def generate_proposal(route):
-    """Generates a new proposed route by swapping two randomly selected points."""
     new_route = list(route)
     idx1, idx2 = random.sample(range(len(route)), 2)
     new_route[idx1], new_route[idx2] = new_route[idx2], new_route[idx1]
     return new_route
 
 def simulated_annealing(points, max_iterations=50000):
-    """Executes the simulated annealing algorithm to find the shortest route."""
     num_points = len(points)
     
     # Initialize with a completely random route
@@ -55,19 +51,15 @@ def simulated_annealing(points, max_iterations=50000):
                 
     return initial_route, best_route
 
-# --- Sanity Check: Points located on a circle ---
 n_points = 20
 
-# Generate perfectly ordered points on a circle
 circle_points = [
     (math.cos(2 * math.pi * i / n_points), math.sin(2 * math.pi * i / n_points)) 
     for i in range(n_points)
 ]
 
-# Run the algorithm (it will shuffle them internally and try to recover the circle)
 initial_path, optimized_path = simulated_annealing(circle_points)
 
-# --- Plotting and Legends ---
 def get_plot_coordinates(points, route):
     """Extracts X and Y coordinates in order, appending the start point to close the loop."""
     x = [points[i][0] for i in route] + [points[route[0]][0]]
