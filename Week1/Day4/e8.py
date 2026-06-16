@@ -39,7 +39,7 @@ def find_optimal_lambda(possible_lambdas, num_samples=10000):
     return optimal_lambda, lowest_variance
 
 def find_optimal_lambda_for_plot(possible_lambdas, num_samples=10000):
-    variances = [] # Store all variances here
+    variances = [] 
     
     for lambda_val in possible_lambdas:
         variance = simulate_variance_for_lambda(lambda_val, num_samples)
