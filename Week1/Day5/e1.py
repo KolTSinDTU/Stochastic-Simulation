@@ -15,9 +15,11 @@ def erling(A, k=1):
 
 
 def propose_next_state(i, m):
-    cur = i / m
-    val = math.fabs(rand.gauss(cur, 1))
-    return int(val * m)
+    u = rand.random()
+    if u < 0.5:
+        return max(0, i - 1)
+    else:
+        return min(m, i + 1)
 
 
 # Returns the next state and whether the move was accepted or not
@@ -29,13 +31,13 @@ def next_state(x, A, m):
     alpha = min(1, g_y / g_x)
 
     if alpha == 1:
-        return y, True
+        return y
     else:
         u = rand.random()
         if u < alpha:
-            return y, True
+            return y
         else:
-            return x, False
+            return x
 
 
 def simulate(A, m):
@@ -45,59 +47,59 @@ def simulate(A, m):
     current_state = 0
 
     for _ in range(3000):
-        next_state_val, accepted = next_state(current_state, A, m)
-        if next_state_val != current_state and accepted:
-            states.append(next_state_val)
-            current_state = next_state_val
+        next_state_val = next_state(current_state, A, m)
+        states.append(next_state_val)
+        current_state = next_state_val
 
     return states[800:]
 
 
-def chi_squared(samples, actual, bins):
+def chi_squared(samples, actual, m):
     T = 0
-    n = len(samples)
-
-    observed = [0] * bins
-    expected = [0] * bins
-    for u in actual:
-        bin_index = int(u * bins)
-        expected[bin_index] += 1
-    for u in samples:
-        bin_index = int(u * bins)
-        observed[bin_index] += 1
-
-    for i in range(bins):
-        T += ((observed[i] - expected[i]) ** 2) / expected[i]
+    for i in range(len(actual)):
+        diff = samples[i] - actual[i]
+        T += (diff**2) / actual[i] if actual[i] > 0 else 0
 
     return T
 
 
-def plot(samples, actual):
-    plt.hist(
-        samples,
-        bins=60,
-        range=(0, 20),
-        alpha=0.6,
-        color="royalblue",
-        edgecolor="blue",
-        label=f"samples",
+def calculate_c(A, m):
+    total = sum(A**i / math.factorial(i) for i in range(m + 1))
+    return 1 / total
+
+
+def theoretical_probs(A, m):
+    c = calculate_c(A, m)
+    return [c * (A**i) / math.factorial(i) for i in range(m + 1)]
+
+
+def simulation_probs(samples, m):
+    total_samples = len(samples)
+    return [samples.count(i) / total_samples for i in range(m + 1)]
+
+
+def plot(samples, actual, m):
+    plt.bar(
+        range(m + 1),
+        actual,
+        alpha=0.5,
+        label="Theoretical Probabilities",
+        color="blue",
     )
 
-    plt.hist(
-        actual,
-        bins=60,
-        range=(0, 20),
-        alpha=0.6,
-        color="darkorange",
-        edgecolor="chocolate",
-        label=f"actual",
+    plt.bar(
+        range(m + 1),
+        simulation_probs(samples, m),
+        alpha=0.5,
+        label="Simulated Probabilities",
+        color="red",
     )
 
     # Formatting the plot
     plt.xlim(left=0)  # Erlang distribution is only defined for x >= 0
     plt.xlabel("Value")
     plt.ylabel("Probability Density")
-    plt.title("Comparison of Two Erlang Probability Distributions")
+    plt.title("Comparison of sampled and theoretical distributions")
     plt.legend(loc="upper right")
     plt.grid(axis="y", linestyle="--", alpha=0.5)
 
@@ -109,8 +111,14 @@ if __name__ == "__main__":
     A = 8
     m = 10
     simulations = simulate(A, m)
-    actual_probs = [erling(A) for _ in range(len(simulations))]
+    actual_probs = theoretical_probs(A, m)
 
-    plot(simulations, actual_probs)
+    plot(simulations, actual_probs, m)
+    print(f"Actual probabilities: {actual_probs}")
+    print(f"Simulated probabilities: {simulation_probs(simulations, m)}")
+
+    print(
+        f"Chi-squared statistic: {chi_squared(simulation_probs(simulations, m), actual_probs, m + 1)}"
+    )
 
     # print(f"Chi-squared statistic: {chi_squared(simulations, actual_probs, m + 1)}")
