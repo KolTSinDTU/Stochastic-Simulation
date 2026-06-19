@@ -1,17 +1,18 @@
 import numpy as np
 import bisect
 
+Q = np.array(
+    [
+        [-0.0085, 0.005, 0.0025, 0, 0.001],
+        [0, -0.014, 0.005, 0.004, 0.005],
+        [0, 0, -0.008, 0.003, 0.005],
+        [0, 0, 0, -0.009, 0.009],
+        [0, 0, 0, 0, 0],
+    ]
+)
+
 
 def get_all_time_series():
-    Q = np.array(
-        [
-            [-0.0085, 0.005, 0.0025, 0, 0.001],
-            [0, -0.014, 0.005, 0.004, 0.005],
-            [0, 0, -0.008, 0.003, 0.005],
-            [0, 0, 0, -0.009, 0.009],
-            [0, 0, 0, 0, 0],
-        ]
-    )
 
     n_women = 1000
     all_time_series = []
@@ -105,21 +106,19 @@ def simulate_interval(start_state, end_state, Q, interval=48.0):
             return path_N, path_S
 
 
-def mcem_estimation(time_series_data, Q_initial, tol=1e-3, max_iter=50):
+def mcem_estimation(time_series_data, Q_initial, tol=1e-3, max_iter=20):
     Q_k = Q_initial.copy()
 
     for iteration in range(max_iter):
-        print(f"Starting iteration {iteration + 1}...")
 
         # Total counts for this iteration
         N_total = np.zeros((5, 5))
         S_total = np.zeros(5)
 
-        # --- 1 & 2. E-Step: Simulate missing paths ---
         for series in time_series_data:
             # Loop through each 48-month observation interval
             for m in range(len(series) - 1):
-                # Convert 1-based clinical states to 0-based Python indices
+
                 start_state = series[m] - 1
                 end_state = series[m + 1] - 1
 
@@ -128,9 +127,8 @@ def mcem_estimation(time_series_data, Q_initial, tol=1e-3, max_iter=50):
                 N_total += path_N
                 S_total += path_S
 
-        # --- 3. M-Step: Update Q matrix ---
         Q_next = np.zeros((5, 5))
-        for i in range(4):  # Only transient states (0 to 3)
+        for i in range(4):
             for j in range(5):
                 if i != j:
                     # q_ij = N_ij / S_i
@@ -139,9 +137,8 @@ def mcem_estimation(time_series_data, Q_initial, tol=1e-3, max_iter=50):
             # Diagonal elements: Negative sum of off-diagonals
             Q_next[i, i] = -np.sum(Q_next[i, :])
 
-        # Check convergence: Infinity norm (max absolute difference)
+        # Check convergence
         diff = np.max(np.abs(Q_k - Q_next))
-        print(f"Max difference: {diff:.6f}")
 
         if diff < tol:
             print("Convergence reached!")
@@ -157,15 +154,20 @@ def mcem_estimation(time_series_data, Q_initial, tol=1e-3, max_iter=50):
 Q_guess = np.array(
     [
         [-0.04, 0.01, 0.01, 0.01, 0.01],
-        [0.000, -0.03, 0.01, 0.01, 0.01],
-        [0.000, 0.000, -0.02, 0.01, 0.01],
-        [0.000, 0.000, 0.000, -0.01, 0.01],
+        [0.01, -0.12, 0.01, 0.09, 0.01],
+        [0.01, 0.08, -0.11, 0.01, 0.01],
+        [0.02, 0.01, 0.01, -0.34, 0.3],
+        # [0.00, -0.03, 0.01, 0.01, 0.01],
+        # [0.000, 0.000, -0.02, 0.01, 0.01],
+        # [0.000, 0.000, 0.000, -0.01, 0.01],
         [0.000, 0.000, 0.000, 0.000, 0.000],
     ]
 )
 
-# Assuming 'all_time_series' is the list of Y(i) arrays from the previous task
 estimated_Q = mcem_estimation(get_all_time_series(), Q_guess)
 
 print("\nEstimated Q Matrix:")
 print(np.round(estimated_Q, 4))
+
+print("Max diff with the true Q Matrix:")
+print(f"\n {np.max(np.abs(estimated_Q - Q))}")
