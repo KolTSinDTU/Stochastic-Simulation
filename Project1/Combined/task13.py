@@ -1,5 +1,6 @@
 import numpy as np
 import bisect
+import matplotlib.pyplot as plt
 
 Q = np.array(
     [
@@ -171,3 +172,64 @@ print(np.round(estimated_Q, 4))
 
 print("Max diff with the true Q Matrix:")
 print(f"\n {np.max(np.abs(estimated_Q - Q))}")
+
+
+# For time series distribution visualiozation in task 12 and 13
+
+def simulate_ctmc(Q, initial_state, n_steps, exit_states=[]):
+    states = [initial_state]
+    times = [0]
+    current_state = states[-1]
+    i = 0
+    while i != n_steps:
+        if current_state in exit_states:
+            break
+        rate = -Q[current_state, current_state]
+        if rate == 0:
+            break
+        time_to_next = np.random.exponential(1/rate)
+        times.append(times[-1] + time_to_next)
+        possible_next_states = np.where(Q[current_state] > 0)[0]
+        probabilities = Q[current_state, possible_next_states] / rate
+        probabilities = probabilities / np.sum(probabilities)  # normalize to ensure sum to 1
+        next_state = np.random.choice(possible_next_states, p=probabilities)
+        states.append(next_state)
+        current_state = next_state
+        i += 1
+    return states, times
+
+def visualize_ctmc_time_series(Q):
+    ctmc_samples_estimated = []
+    for _ in range(1000):
+        print(f"Simulating sample {_+1}/1000", end="\r")
+        ctmc_samples_estimated.append(simulate_ctmc(Q, initial_state=0, n_steps=-1, exit_states=[4]))
+
+    ctmc_time_series_estimated = []
+    for states, times in ctmc_samples_estimated:
+        time_points = np.arange(0, times[-1]+1, 48)
+        series = []
+        for t in time_points:
+            idx = np.searchsorted(times, t, side='right') - 1
+            series.append(states[idx])
+        ctmc_time_series_estimated.append(series)
+
+    ctmc_state_counts = np.zeros((len(Q), max(len(s) for s in ctmc_time_series_estimated)))
+    for series in ctmc_time_series_estimated:
+        series = series + [4] * (ctmc_state_counts.shape[1] - len(series)) # pad series with dead state if shorter than max length
+        for t, state in enumerate(series):
+            ctmc_state_counts[state, t] += 1
+
+
+    plt.figure(figsize=(8, 6))
+
+    colors = ['#fde725', '#5ec962', '#21918c', '#3b528b', '#440154']
+    state_labels = ['Healthy', 'Local Recurrence', 'Distant Recurrence', 'Both Recurrences', 'Death']
+
+    for i in range(len(Q)):
+        plt.plot(ctmc_state_counts[i, :], marker='o', label=state_labels[i], color=colors[i])
+    plt.xticks(np.arange(0, ctmc_state_counts.shape[1],2), 4*np.arange(0, ctmc_state_counts.shape[1],2))
+    plt.xlabel('Time (years)')
+    plt.ylabel('Count')
+    plt.title('State Counts Over Time with 48-month Intervals (Estimated Q)')
+    plt.legend()
+    plt.show()
