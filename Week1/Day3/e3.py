@@ -18,6 +18,10 @@ def get_hyperexponential(p1=0.8, lambda1=0.8333, lambda2=5.0):
     else:
         return random.expovariate(lambda2)
 
+def get_pareto(mean, k):
+    xm = mean * (k - 1) / k
+    return xm * random.paretovariate(k)
+
 def run_simulation(m, arrival_rate, service_time_func, total_customers):
     # Event types
     ARRIVAL = 0
@@ -77,6 +81,7 @@ if __name__ == "__main__":
         ("Constant", lambda: mean_service_time),
         ("Erlang-1.05", lambda: get_erlang(mean_service_time, 1.05)),
         ("Erlang-2.05", lambda: get_erlang(mean_service_time, 2.05)),
+        ("Pareto-1.05", lambda: get_pareto(mean_service_time, 1.05)),
         ("Exponential", lambda: get_exponential(1/mean_service_time))
     ]
 

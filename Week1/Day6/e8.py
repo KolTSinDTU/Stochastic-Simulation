@@ -15,6 +15,27 @@ boot_means_1 = np.mean(boot_samples_1, axis=1)
 # So we compute P{-5 < X_bar* - x_bar < 5}
 p_estimate = np.mean((boot_means_1 - x_bar_1 > -5) & (boot_means_1 - x_bar_1 < 5))
 
+# 1. Variance of the bootstrap sample means
+boot_var_1 = np.var(boot_means_1, ddof=1)
+boot_se_1 = np.std(boot_means_1, ddof=1) # Standard Error
+
+# 2. 95% Confidence Interval: Percentile Method
+# This takes the direct 2.5th and 97.5th percentiles of the bootstrap distribution
+ci_lower_perc = np.percentile(boot_means_1, 2.5)
+ci_upper_perc = np.percentile(boot_means_1, 97.5)
+
+
+ci_lower_norm = x_bar_1 - 1.96 * boot_se_1
+ci_upper_norm = x_bar_1 + 1.96 * boot_se_1
+
+print(f"--- Part 1 ---")
+print(f"Sample mean (x_bar): {x_bar_1:.4f}")
+print(f"Estimated p: {p_estimate:.4f}")
+print(f"Bootstrap Variance of Mean: {boot_var_1:.4f}")
+print(f"Bootstrap Standard Error: {boot_se_1:.4f}")
+print(f"95% CI (Percentile Method): ({ci_lower_perc:.4f}, {ci_upper_perc:.4f})")
+print(f"95% CI (Normal Approx):     ({ci_lower_norm:.4f}, {ci_upper_norm:.4f})")
+
 # Part 2: Ross, Chapter 8, Exercise 15
 x_2 = np.array([5, 4, 9, 6, 21, 17, 11, 20, 7, 10, 21, 15, 13, 16, 8])
 n_2 = len(x_2)
