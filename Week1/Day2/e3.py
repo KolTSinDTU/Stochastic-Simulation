@@ -32,7 +32,14 @@ def test_normal_fit(sample_data):
     return ks_statistic, p_value
 
 
-def test_pareto_fit(sample_data, k, beta):
+def test_pareto_fit(sample1, sample2):
+
+    ks_statistic, p_value = stats.ks_2samp(sample1, sample2)
+
+    return ks_statistic, p_value
+
+
+def test_pareto_composition_fit(sample_data, k, beta):
 
     # Perform the KS test against the theoretical 'pareto' distribution
     ks_statistic, p_value = stats.kstest(sample_data, "pareto", args=(k, 0, beta))
@@ -58,7 +65,7 @@ def pareto_distribution(beta, k):
 def pareto_composition(beta):
     e1 = exp_distribution(beta)
     e2 = exp_distribution(e1)
-    return e2
+    return e2 + beta
 
 
 def theoretical_pareto_mean(beta, k):
@@ -190,9 +197,7 @@ def confidence_interval(data, variance_ci=False, confidence=0.95):
     return float(mean_lower_ci), float(mean_upper_ci)
 
 
-def plot_pareto_composition():
-    beta = 1
-    k = 1
+def plot_pareto_composition(beta, k):
     pareto_values_composition = [pareto_composition(beta) for _ in range(SAMPLES)]
     pareto_values_direct = [pareto_distribution(beta, k) for _ in range(SAMPLES)]
 
@@ -201,13 +206,19 @@ def plot_pareto_composition():
     # Plot just the two histograms with transparency (alpha) and labels
     plt.hist(
         pareto_values_composition,
-        bins=50,
+        bins=100,
+        range=(0, 50),
         density=True,
         alpha=0.6,
         label="Composition Method",
     )
     plt.hist(
-        pareto_values_direct, bins=50, density=True, alpha=0.6, label="Inverse Method"
+        pareto_values_direct,
+        range=(0, 50),
+        bins=100,
+        density=True,
+        alpha=0.6,
+        label="Inverse Method",
     )
 
     # Start the plot from x > beta
@@ -220,6 +231,11 @@ def plot_pareto_composition():
     plt.xlabel("Value")
     plt.ylabel("Density")
     plt.show()
+
+    ks_statistic, p_value = test_pareto_fit(
+        pareto_values_composition, pareto_values_direct
+    )
+    print(f"KS Statistic: {ks_statistic:.4f}, P-value: {p_value:.4f}")
 
 
 def plot_ci(confidence_intervals, theoretical_value=1):
@@ -282,6 +298,7 @@ def plot_ci(confidence_intervals, theoretical_value=1):
 if __name__ == "__main__":
     # plot_exp_distribution()
     # plot_normal_distribution()
+    plot_pareto_composition(1, 1)
     # fig, axs = plt.subplots(4)
     # axs[0].set_title("Pareto Distribution with Different k Values")
 
@@ -297,20 +314,20 @@ if __name__ == "__main__":
     # compare_pareto_statistics(1, 4)
 
     # confidence intervals for the normal distribution
-    confidence_intervals = []
-    for _ in range(100):
-        normal_data = [box_muller()[0] for _ in range(10)]
-        confidence_intervals.append(confidence_interval(normal_data))
-    plot_ci(
-        confidence_intervals, theoretical_value=0
-    )  # Theoretical mean of standard normal is 0
+    # confidence_intervals = []
+    # for _ in range(100):
+    #     normal_data = [box_muller()[0] for _ in range(10)]
+    #     confidence_intervals.append(confidence_interval(normal_data))
+    # plot_ci(
+    #     confidence_intervals, theoretical_value=0
+    # )  # Theoretical mean of standard normal is 0
 
-    confidence_intervals_var = []
-    for _ in range(100):
-        normal_data = [box_muller()[0] for _ in range(10)]
-        confidence_intervals_var.append(
-            confidence_interval(normal_data, variance_ci=True)
-        )
-    plot_ci(
-        confidence_intervals_var, theoretical_value=1
-    )  # Theoretical variance of standard normal is 1
+    # confidence_intervals_var = []
+    # for _ in range(100):
+    #     normal_data = [box_muller()[0] for _ in range(10)]
+    #     confidence_intervals_var.append(
+    #         confidence_interval(normal_data, variance_ci=True)
+    #     )
+    # plot_ci(
+    #     confidence_intervals_var, theoretical_value=1
+    # )  # Theoretical variance of standard normal is 1
