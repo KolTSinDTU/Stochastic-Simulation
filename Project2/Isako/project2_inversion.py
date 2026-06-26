@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 # ==============================================================================
 # CONFIGURABLE PARAMETERS
 # ==============================================================================
-REPLICATIONS = 100          # Number of replications per simulation run
+REPLICATIONS = 100         # Number of replications per simulation run
 DEFAULT_TOTAL_BEDS = 75     # Default total beds to optimize
 LOS_DISTRIBUTION = 'lognormal'  # Default LOS distribution ('lognormal' or 'exponential')
 PLOT_DIR = '.'              # Directory where plots will be saved
@@ -50,76 +50,62 @@ def Lambda1_cum(t):
         t = 365.0
     return - (t ** 3) / 10950.0 + (t ** 2) / 20.0
 
-def invert_Lambda1(S):
+def invert_Lambda1_vectorized(S_array):
     """
-    Inverts Lambda1(t) = S to find t in [0, 365] using the Bisection Method.
-    This is based on the Inverse Transform Method.
+    Inverts Lambda1(t) = S for an array of S values using a vectorized bisection search.
     """
-    max_val = Lambda1_cum(365.0)  # ~ 2220.4167
-    if S <= 0:
-        return 0.0
-    if S >= max_val:
-        return 365.0
+    max_val = Lambda1_cum(365.0)
+    S_array = np.clip(S_array, 0.0, max_val)
     
-    # Binary search (Bisection method)
-    low = 0.0
-    high = 365.0
-    for _ in range(30):  # 30 iterations gives precision ~ 3e-7 days
+    low = np.zeros_like(S_array)
+    high = np.full_like(S_array, 365.0)
+    
+    for _ in range(30):
         mid = (low + high) / 2.0
-        val = Lambda1_cum(mid)
-        if val < S:
-            low = mid
-        else:
-            high = mid
+        val = - (mid ** 3) / 10950.0 + (mid ** 2) / 20.0
+        mask = val < S_array
+        low = np.where(mask, mid, low)
+        high = np.where(mask, high, mid)
+        
     return (low + high) / 2.0
 
 def generate_arrivals_inversion():
     """
     Generates arrival times for all three patient types on [0, 365]
-    using the Inversion/Time-Transformation method.
-    Returns:
-        List of tuples: (arrival_time, patient_type) sorted by arrival_time.
-        Where patient_type is 1 (Ward A), 2 (Ward B), or 3 (Ward C).
+    using the Inversion/Time-Transformation method with NumPy vectorization.
     """
-    arrivals = []
+    max_S = Lambda1_cum(365.0)
     
     # --- Ward A Arrivals ---
-    # Generate homogeneous Poisson arrivals S_i with rate 1
-    S = 0.0
-    max_S = Lambda1_cum(365.0)
-    while True:
-        S += -math.log(random.random())  # Exponential(1) step
-        if S > max_S:
-            break
-        # Invert to get actual arrival time
-        t = invert_Lambda1(S)
-        arrivals.append((t, 1))
-        
+    steps_A = np.random.exponential(1.0, size=2500)
+    S_A = np.cumsum(steps_A)
+    S_A = S_A[S_A <= max_S]
+    t_A = invert_Lambda1_vectorized(S_A)
+    
     # --- Ward B Arrivals ---
-    # Since lambda_2(t) = 0.2 * lambda_1(t), cumulative is Lambda_2(t) = 0.2 * Lambda_1(t)
-    # To solve Lambda_2(t) = S' for t, we solve 0.2 * Lambda_1(t) = S' => Lambda_1(t) = 5 * S'
-    S_prime = 0.0
     max_S_prime = 0.2 * max_S
-    while True:
-        S_prime += -math.log(random.random())  # Exponential(1) step
-        if S_prime > max_S_prime:
-            break
-        # Invert using the Ward A function with scaled S_prime
-        t = invert_Lambda1(5.0 * S_prime)
-        arrivals.append((t, 2))
-        
+    steps_B = np.random.exponential(1.0, size=600)
+    S_B = np.cumsum(steps_B)
+    S_B = S_B[S_B <= max_S_prime]
+    t_B = invert_Lambda1_vectorized(5.0 * S_B)
+    
     # --- Ward C Arrivals ---
-    # Ward C has constant arrival rate lambda_3 = 6.0
-    t = 0.0
-    while True:
-        t += -math.log(random.random()) / 6.0  # Exponential(6) step
-        if t > 365.0:
-            break
-        arrivals.append((t, 3))
-        
-    # Merge and sort all arrivals chronologically
-    arrivals.sort(key=lambda x: x[0])
-    return arrivals
+    steps_C = np.random.exponential(1.0 / 6.0, size=2400)
+    t_C = np.cumsum(steps_C)
+    t_C = t_C[t_C <= 365.0]
+    
+    # Combine and sort
+    n_A = len(t_A)
+    n_B = len(t_B)
+    n_C = len(t_C)
+    
+    times = np.concatenate([t_A, t_B, t_C])
+    types = np.concatenate([np.ones(n_A, dtype=np.int32), 
+                            np.full(n_B, 2, dtype=np.int32), 
+                            np.full(n_C, 3, dtype=np.int32)])
+    
+    idx = np.argsort(times)
+    return list(zip(times[idx], types[idx]))
 
 # ==============================================================================
 # LENGTH-OF-STAY SAMPLING
@@ -149,7 +135,24 @@ def sample_los(ward, dist_type):
 def run_simulation(N_A, N_B, N_C, arrivals, los_distribution="lognormal"):
     """
     Simulates patient flow for the given bed distribution and arrivals.
+    Pre-generates all length-of-stay samples upfront using NumPy vectorization for performance.
     """
+    n_arr = len(arrivals)
+    if los_distribution == 'lognormal':
+        los_A = np.random.lognormal(MU_A, SIGMA_A, size=n_arr)
+        los_B = np.random.lognormal(MU_B, SIGMA_B, size=n_arr)
+        los_C = np.random.lognormal(MU_C, SIGMA_C, size=n_arr)
+    elif los_distribution == 'exponential':
+        los_A = np.random.exponential(8.0, size=n_arr)
+        los_B = np.random.exponential(12.0, size=n_arr)
+        los_C = np.random.exponential(10.0, size=n_arr)
+    else:
+        raise ValueError("Unknown distribution type")
+        
+    idx_A = 0
+    idx_B = 0
+    idx_C = 0
+    
     occupied_A = 0
     occupied_B = 0
     occupied_C = 0
@@ -196,7 +199,8 @@ def run_simulation(N_A, N_B, N_C, arrivals, los_distribution="lognormal"):
         if p_type == 1:  # Regular care (Ward A)
             if occupied_A < N_A:
                 occupied_A += 1
-                los = sample_los('A', los_distribution)
+                los = los_A[idx_A]
+                idx_A += 1
                 heapq.heappush(departures, (arr_time + los, 'A'))
             else:
                 blocked_counts[idx] += 1
@@ -204,11 +208,13 @@ def run_simulation(N_A, N_B, N_C, arrivals, los_distribution="lognormal"):
         elif p_type == 2:  # Intensive care (Ward B)
             if occupied_B < N_B:
                 occupied_B += 1
-                los = sample_los('B', los_distribution)
+                los = los_B[idx_B]
+                idx_B += 1
                 heapq.heappush(departures, (arr_time + los, 'B'))
             elif occupied_A < N_A:  # Overflow spillover to Ward A
                 occupied_A += 1
-                los = sample_los('B', los_distribution)
+                los = los_B[idx_B]
+                idx_B += 1
                 heapq.heappush(departures, (arr_time + los, 'A'))
             else:
                 blocked_counts[idx] += 1
@@ -216,7 +222,8 @@ def run_simulation(N_A, N_B, N_C, arrivals, los_distribution="lognormal"):
         elif p_type == 3:  # Other care (Ward C)
             if occupied_C < N_C:
                 occupied_C += 1
-                los = sample_los('C', los_distribution)
+                los = los_C[idx_C]
+                idx_C += 1
                 heapq.heappush(departures, (arr_time + los, 'C'))
             else:
                 blocked_counts[idx] += 1
@@ -324,7 +331,7 @@ def optimize_bed_allocation_grid(total_beds, los_dist, coarse_arrivals, fine_arr
             
     return best_fine_alloc, best_fine_score
 
-def optimize_bed_allocation_sa(total_beds, los_dist, arrivals_list, init_temp=100.0, cooling_rate=0.95, min_temp=0.1, steps_per_temp=10):
+def optimize_bed_allocation_sa(total_beds, los_dist, arrivals_list, init_temp=10.0, cooling_rate=0.85, min_temp=0.5, steps_per_temp=4):
     """
     Finds the optimal allocation of beds (N_A, N_B, N_C) using Simulated Annealing.
     Minimizes the total number of relocated patients.
@@ -391,11 +398,12 @@ def optimize_bed_allocation_sa(total_beds, los_dist, arrivals_list, init_temp=10
 def optimize_bed_allocation(total_beds, los_dist, coarse_arrivals, fine_arrivals):
     """
     Finds the optimal bed allocation using Simulated Annealing, and compares it with Grid Search.
+    Uses mini-batching (subset of coarse_arrivals) to evaluate SA candidates for speed.
     """
     print(f"Optimizing allocation for {total_beds} beds ({los_dist} LOS)...")
     
-    # 1. Run Simulated Annealing (using coarse_arrivals for speed)
-    sa_alloc, sa_score_coarse = optimize_bed_allocation_sa(total_beds, los_dist, coarse_arrivals)
+    # 1. Run Simulated Annealing (using a mini-batch of 20 coarse arrivals for speed)
+    sa_alloc, sa_score_coarse = optimize_bed_allocation_sa(total_beds, los_dist, coarse_arrivals[:20])
     # Evaluate SA best on fine_arrivals
     _, sa_blocked_fine, _, _ = run_multiple_simulations(*sa_alloc, fine_arrivals, los_dist)
     sa_score_fine = sum(sa_blocked_fine)
