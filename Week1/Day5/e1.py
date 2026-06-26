@@ -54,11 +54,13 @@ def simulate(A, m):
     return states[800:]
 
 
-def chi_squared(samples, actual, m):
+def chi_squared(samples, actual, sample_size):
     T = 0
     for i in range(len(actual)):
-        diff = samples[i] - actual[i]
-        T += (diff**2) / actual[i] if actual[i] > 0 else 0
+        observed = sample_size * samples[i]
+        expected = sample_size * actual[i]
+        diff = observed - expected
+        T += (diff**2) / expected if expected > 0 else 0
 
     return T
 
@@ -113,12 +115,14 @@ if __name__ == "__main__":
     simulations = simulate(A, m)
     actual_probs = theoretical_probs(A, m)
 
-    plot(simulations, actual_probs, m)
+    # plot(simulations, actual_probs, m)
     print(f"Actual probabilities: {actual_probs}")
     print(f"Simulated probabilities: {simulation_probs(simulations, m)}")
 
-    print(
-        f"Chi-squared statistic: {chi_squared(simulation_probs(simulations, m), actual_probs, m + 1)}"
+    chi_statistic = chi_squared(
+        simulation_probs(simulations, m), actual_probs, len(simulations)
     )
 
-    # print(f"Chi-squared statistic: {chi_squared(simulations, actual_probs, m + 1)}")
+    print(f"Chi-squared statistic: {chi_statistic}")
+
+    print(f"p-value : {stats.chi2.sf(chi_statistic, df=m)}")

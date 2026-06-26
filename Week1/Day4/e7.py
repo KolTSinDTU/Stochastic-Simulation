@@ -5,7 +5,7 @@ import scipy
 import math
 import matplotlib.pyplot as plt
 
-SAMPLES = 1000
+SAMPLES = 10000
 
 
 def standard_normal():
@@ -38,7 +38,7 @@ def importance_sampling_estimate(a):
 
 
 if __name__ == "__main__":
-    a = 3
+    a = 0.7
 
     print("Crude Monte Carlo Estimation:")
     crude_estimates = [crude_estimate(a) for _ in range(10)]

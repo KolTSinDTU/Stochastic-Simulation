@@ -117,11 +117,7 @@ def get_covariance(x, y):
     return covariance
 
 
-if __name__ == "__main__":
-    m = 10
-    service_rate = 1 / 8
-    arrival_rate = 1
-
+def get_crude_estimates(m, service_rate, arrival_rate, samples=SAMPLES):
     blocking_fractions = []
     avg_service_times = []
     avg_inter_arrival_times = []
@@ -139,30 +135,48 @@ if __name__ == "__main__":
     print(f"Confidence interval for crude estimate: {confidence_int}")
     print(f"Variance: {np.var(blocking_fractions, ddof=1):.8f} \n")
 
+
+def estimate_c(m, service_rate, arrival_rate, samples=SAMPLES):
+    blocking_fractions = []
+    avg_service_times = []
+    avg_inter_arrival_times = []
+    for _ in range(10):
+        sim = Simulation(m, service_rate, arrival_rate)
+        sim.run()
+        blocking_fractions.append(sim.get_blocking_fraction())
+        avg_service_times.append(sim.get_mean_service_time())
+        avg_inter_arrival_times.append(sim.get_mean_inter_arrival_time())
+
     covariance_service = get_covariance(blocking_fractions, avg_service_times)
     var_service_times = np.var(avg_service_times, ddof=1)
     c = -covariance_service / var_service_times
-    control_variate_estimates = [
-        blocking_fractions[i] + c * (avg_service_times[i] - 8)
-        for i in range(len(blocking_fractions))
-    ]
+    return c
 
-    ci_lower, ci_upper = confidence_interval(control_variate_estimates)
-    # print(f"Estimated Mean (Control Variate): {np.mean(control_variate_estimates):.4f}")
-    print(
-        f"Confidence Interval with service times as control variates: [{ci_lower:.4f}, {ci_upper:.4f}]"
-    )
-    print(
-        f"Variance with control variates: {np.var(control_variate_estimates, ddof=1):.8f} \n"
-    )
 
-    covariance_arrivals = get_covariance(blocking_fractions, avg_inter_arrival_times)
-    var_inter_arrival_times = np.var(avg_inter_arrival_times, ddof=1)
-    c = -covariance_arrivals / var_inter_arrival_times
+if __name__ == "__main__":
+    m = 10
+    service_rate = 1 / 8
+    arrival_rate = 1
+
+    get_crude_estimates(m, service_rate, arrival_rate)
+
+    c = estimate_c(m, arrival_rate, arrival_rate)
+    blocking_fractions = []
+    avg_service_times = []
+    avg_inter_arrival_times = []
+    for _ in range(10):
+        sim = Simulation(m, service_rate, arrival_rate)
+        sim.run()
+        blocking_fractions.append(sim.get_blocking_fraction())
+        avg_service_times.append(sim.get_mean_service_time())
+        avg_inter_arrival_times.append(sim.get_mean_inter_arrival_time())
+
     control_variate_estimates = [
         blocking_fractions[i] + c * (avg_inter_arrival_times[i] - 8)
         for i in range(len(blocking_fractions))
     ]
+
+    ci_lower, ci_upper = confidence_interval(control_variate_estimates)
 
     print(
         f"Confidence Interval with inter-arrival times as control variates: [{ci_lower:.4f}, {ci_upper:.4f}]"
