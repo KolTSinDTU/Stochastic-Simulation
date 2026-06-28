@@ -4,8 +4,9 @@ import numpy as np
 import math
 from scipy import stats
 
-SAMPLES = 3000
-BURN_IN = 800
+SAMPLES = 300000
+BURN_IN = 8000
+THINNING = 20
 
 
 class proposal:
@@ -15,19 +16,21 @@ class proposal:
 
 
 def trunc_poisson(i, j, A1, A2):
+    if i + j > 10 or i < 0 or j < 0:
+        return 0
     return (A1**i) * (A2**j) / (math.factorial(i) * math.factorial(j))
 
 
 def propose_next_state_together(i, j, m):
     u = rand.random()
     if u < 0.25:
-        return max(0, i - 1), max(0, j - 1)
+        return i - 1, j
     elif u < 0.5:
-        return min(m, i + 1), min(m, j + 1)
+        return i + 1, j
     elif u < 0.75:
-        return max(0, i - 1), min(m, j + 1)
+        return i, j - 1
     else:
-        return min(m, i + 1), max(0, j - 1)
+        return i, j + 1
 
 
 def propose_next_state(i, m):
@@ -36,6 +39,14 @@ def propose_next_state(i, m):
         return max(0, i - 1)
     else:
         return min(m, i + 1)
+
+
+def propose_next_state_separate(i, j, m):
+    u = rand.random()
+    if u < 0.5:
+        return propose_next_state(i, m), j
+    else:
+        return i, propose_next_state(j, m)
 
 
 def get_gibbs_next(i, j, A1=4, A2=4, m=10):
@@ -57,12 +68,9 @@ def next_state(i, j, A1, A2, m, proposal_type):
     y = ()
     if proposal_type == proposal.TOGETHER:
         y = propose_next_state_together(i, j, m)
-        while y[0] + y[1] > m:
-            y = propose_next_state_together(i, j, m)
+
     elif proposal_type == proposal.SEPARATE:
         y = propose_next_state(i, m), propose_next_state(j, m)
-        while y[0] + y[1] > m:
-            y = propose_next_state_together(i, j, m)
 
     g_y = trunc_poisson(y[0], y[1], A1, A2)
 
@@ -96,7 +104,7 @@ def simulate(A1, A2, m, proposal_type):
             next_state_val = next_state(
                 current_state[0], current_state[1], A1, A2, m, proposal_type
             )
-        if _ >= BURN_IN:
+        if _ >= BURN_IN and _ % THINNING == 0:
             states[current_state[0]][current_state[1]] += 1
 
         current_state = next_state_val
@@ -104,12 +112,12 @@ def simulate(A1, A2, m, proposal_type):
     return states
 
 
-def chi_squared(samples, actual, m):
+def chi_squared(samples, actual, sample_size):
     T = 0
     for i in range(samples.shape[0]):
         for j in range(samples.shape[1]):
-            diff = samples[i][j] - actual[i][j]
-            T += (diff**2) / actual[i][j] if actual[i][j] > 0 else 0
+            diff = sample_size * samples[i][j] - sample_size * actual[i][j]
+            T += (diff**2) / (sample_size * actual[i][j]) if actual[i][j] > 0 else 0
 
     return T
 
@@ -134,7 +142,7 @@ def theoretical_probs(A1, A2, m):
 
 
 def simulation_probs(samples, m):
-    total_samples = SAMPLES - BURN_IN
+    total_samples = np.sum(samples)
 
     probs = np.zeros(shape=(m + 1, m + 1), dtype=float)
 
@@ -246,14 +254,24 @@ if __name__ == "__main__":
     # print(f"Actual probabilities: {actual_probs}")
     # print(f"Simulated probabilities: {simulation_probs(together_simulation, m)}")
 
+    together_chi_statistic = chi_squared(
+        together_simulated_probs, actual_probs, np.sum(together_simulation)
+    )
+    separate_chi_statistic = chi_squared(
+        separate_simulated_probs, actual_probs, np.sum(separate_simulation)
+    )
+    gibbs_chi_statistic = chi_squared(
+        gibbs_simulated_probs, actual_probs, np.sum(gibbs_simulation)
+    )
+
     print(
-        f"Together sampled Chi-squared statistic: {chi_squared(together_simulated_probs, actual_probs, m + 1)}"
+        f"Together sampled Chi-squared statistic: {together_chi_statistic} with p-value: {1 - stats.chi2.cdf(together_chi_statistic, df=66)}"
     )
     print(
-        f"Separate sampled Chi-squared statistic: {chi_squared(separate_simulated_probs, actual_probs, m + 1)}"
+        f"Separate sampled Chi-squared statistic: {separate_chi_statistic} with p-value: {1 - stats.chi2.cdf(separate_chi_statistic, df=66)}"
     )
     print(
-        f"Gibbs sampled Chi-squared statistic: {chi_squared(gibbs_simulated_probs, actual_probs, m + 1)}"
+        f"Gibbs sampled Chi-squared statistic: {gibbs_chi_statistic} with p-value: {1 - stats.chi2.cdf(gibbs_chi_statistic, df=66)}"
     )
 
     # print(f"Chi-squared statistic: {chi_squared(together_simulation, actual_probs, m + 1)}")
